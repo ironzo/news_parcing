@@ -1,15 +1,19 @@
 """
 Database models for storing economic news and trading data.
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy import Column, Integer, String, Float, DateTime, Text, Boolean, create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import declarative_base, sessionmaker
 
 
 Base = declarative_base()
+
+
+def utc_now():
+    """Return current UTC time (timezone-aware)."""
+    return datetime.now(timezone.utc)
 
 
 class EconomicNews(Base):
@@ -26,7 +30,7 @@ class EconomicNews(Base):
     previous = Column(String(100), nullable=True)
     actual = Column(String(100), nullable=True)  # To be filled after event occurs
     link = Column(Text, nullable=True)
-    scraped_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    scraped_at = Column(DateTime, default=utc_now, nullable=False)
     
     def __repr__(self):
         return f"<EconomicNews(id={self.id}, title='{self.title}', event_time='{self.event_time}')>"
@@ -127,7 +131,7 @@ class BacktestResult(Base):
     max_drawdown = Column(Float, nullable=True)
     num_trades = Column(Integer, nullable=False)
     win_rate = Column(Float, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
     
     def __repr__(self):
         return f"<BacktestResult(run_id='{self.run_id}', return={self.total_return:.2%})>"

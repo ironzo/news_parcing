@@ -95,7 +95,8 @@ def test_fetch_page_success(mock_get, scraper):
 @patch('src.scrapers.investing_scraper.requests.get')
 def test_fetch_page_failure(mock_get, scraper):
     """Test failed page fetch."""
-    mock_get.side_effect = Exception("Connection error")
+    import requests
+    mock_get.side_effect = requests.RequestException("Connection error")
     
     result = scraper.fetch_page()
     
