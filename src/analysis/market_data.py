@@ -65,34 +65,53 @@ class MarketDataFetcher:
         logger.info(f"Fetching historical data for {symbol} from {start_date} to {end_date}")
         
         try:
-            # Create yfinance ticker object
-            ticker = yf.Ticker(symbol)
+            # Convert datetime to string format for yfinance compatibility
+            start_str = start_date.strftime('%Y-%m-%d') if isinstance(start_date, datetime) else str(start_date)
+            end_str = end_date.strftime('%Y-%m-%d') if isinstance(end_date, datetime) else str(end_date)
             
-            # Fetch historical data
-            df = ticker.history(
-                start=start_date,
-                end=end_date,
+            # Use yf.download() which is more reliable than Ticker.history()
+            df = yf.download(
+                tickers=symbol,
+                start=start_str,
+                end=end_str,
                 interval=interval,
-                auto_adjust=True  # Adjust for splits and dividends
+                auto_adjust=True,
+                progress=False
             )
             
             if df.empty:
                 raise ValueError(f"No data returned for {symbol}")
             
+            # Handle MultiIndex columns from yfinance (newer versions)
+            if isinstance(df.columns, pd.MultiIndex):
+                # Flatten MultiIndex columns - take first level (Price type)
+                df.columns = [col[0] if isinstance(col, tuple) else col for col in df.columns]
+            
             # Normalize column names
             df = df.reset_index()
-            df = df.rename(columns={
+            
+            # Map various possible column names to standard names
+            column_mapping = {
                 'Date': 'timestamp',
                 'Datetime': 'timestamp',
+                'index': 'timestamp',
                 'Open': 'open',
                 'High': 'high',
                 'Low': 'low',
                 'Close': 'close',
+                'Adj Close': 'close',
                 'Volume': 'volume'
-            })
+            }
+            
+            # Only rename columns that exist
+            rename_dict = {k: v for k, v in column_mapping.items() if k in df.columns}
+            df = df.rename(columns=rename_dict)
             
             # Select relevant columns
             columns = ['timestamp', 'open', 'high', 'low', 'close', 'volume']
+            missing_cols = [c for c in columns if c not in df.columns]
+            if missing_cols:
+                raise ValueError(f"Missing columns after normalization: {missing_cols}")
             df = df[columns]
             
             # Validate and clean data

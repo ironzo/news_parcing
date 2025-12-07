@@ -73,22 +73,21 @@ def sample_news_events():
 class TestMarketDataFetcher:
     """Tests for MarketDataFetcher class."""
     
-    @patch('src.analysis.market_data.yf.Ticker')
-    def test_fetch_historical_data_success(self, mock_ticker, fetcher):
+    @patch('src.analysis.market_data.yf.download')
+    def test_fetch_historical_data_success(self, mock_download, fetcher):
         """Test successful data fetch from yfinance."""
-        # Mock yfinance response
+        # Mock yfinance response (simulating new yfinance format)
+        dates = pd.date_range(start='2023-01-01', end='2023-01-05', freq='D')
         mock_df = pd.DataFrame({
-            'Date': pd.date_range(start='2023-01-01', end='2023-01-05', freq='D'),
             'Open': [100, 101, 102, 103, 104],
             'High': [102, 103, 104, 105, 106],
             'Low': [99, 100, 101, 102, 103],
             'Close': [101, 102, 103, 104, 105],
             'Volume': [1000000, 1100000, 1200000, 1300000, 1400000],
-        }).set_index('Date')
+        }, index=dates)
+        mock_df.index.name = 'Date'
         
-        mock_ticker_instance = Mock()
-        mock_ticker_instance.history.return_value = mock_df
-        mock_ticker.return_value = mock_ticker_instance
+        mock_download.return_value = mock_df
         
         # Fetch data
         result = fetcher.fetch_historical_data(
@@ -101,15 +100,13 @@ class TestMarketDataFetcher:
         # Assertions
         assert len(result) == 5
         assert list(result.columns) == ['timestamp', 'open', 'high', 'low', 'close', 'volume']
-        assert all(result['high'] >= result['low'])
-        assert all(result['timestamp'].dt.tz == UTC)
+        assert (result['high'] >= result['low']).all()
+        assert result['timestamp'].dt.tz == UTC
     
-    @patch('src.analysis.market_data.yf.Ticker')
-    def test_fetch_historical_data_empty_response(self, mock_ticker, fetcher):
+    @patch('src.analysis.market_data.yf.download')
+    def test_fetch_historical_data_empty_response(self, mock_download, fetcher):
         """Test handling of empty data response."""
-        mock_ticker_instance = Mock()
-        mock_ticker_instance.history.return_value = pd.DataFrame()
-        mock_ticker.return_value = mock_ticker_instance
+        mock_download.return_value = pd.DataFrame()
         
         # Should raise ValueError
         with pytest.raises(ValueError, match="No data returned"):
@@ -140,21 +137,20 @@ class TestMarketDataFetcher:
         assert all(result['high'] >= result['low'])
         assert all(result['open'] > 0)
     
-    @patch('src.analysis.market_data.yf.Ticker')
-    def test_fetch_multiple_symbols(self, mock_ticker, fetcher):
+    @patch('src.analysis.market_data.yf.download')
+    def test_fetch_multiple_symbols(self, mock_download, fetcher):
         """Test fetching data for multiple symbols."""
+        dates = pd.date_range(start='2023-01-01', end='2023-01-05', freq='D')
         mock_df = pd.DataFrame({
-            'Date': pd.date_range(start='2023-01-01', end='2023-01-05', freq='D'),
             'Open': [100, 101, 102, 103, 104],
             'High': [102, 103, 104, 105, 106],
             'Low': [99, 100, 101, 102, 103],
             'Close': [101, 102, 103, 104, 105],
             'Volume': [1000000, 1100000, 1200000, 1300000, 1400000],
-        }).set_index('Date')
+        }, index=dates)
+        mock_df.index.name = 'Date'
         
-        mock_ticker_instance = Mock()
-        mock_ticker_instance.history.return_value = mock_df
-        mock_ticker.return_value = mock_ticker_instance
+        mock_download.return_value = mock_df
         
         symbols = ['SPY', 'QQQ', 'DIA']
         results = fetcher.fetch_multiple_symbols(
@@ -361,19 +357,18 @@ class TestIntegration:
         fetcher = MarketDataFetcher(repo)
         
         # Mock yfinance to avoid actual API calls
-        with patch('src.analysis.market_data.yf.Ticker') as mock_ticker:
+        with patch('src.analysis.market_data.yf.download') as mock_download:
+            dates = pd.date_range(start='2023-01-01', end='2023-01-05', freq='D')
             mock_df = pd.DataFrame({
-                'Date': pd.date_range(start='2023-01-01', end='2023-01-05', freq='D'),
                 'Open': [100, 101, 102, 103, 104],
                 'High': [102, 103, 104, 105, 106],
                 'Low': [99, 100, 101, 102, 103],
                 'Close': [101, 102, 103, 104, 105],
                 'Volume': [1000000, 1100000, 1200000, 1300000, 1400000],
-            }).set_index('Date')
+            }, index=dates)
+            mock_df.index.name = 'Date'
             
-            mock_ticker_instance = Mock()
-            mock_ticker_instance.history.return_value = mock_df
-            mock_ticker.return_value = mock_ticker_instance
+            mock_download.return_value = mock_df
             
             # Fetch and save data
             df = fetcher.fetch_historical_data(
